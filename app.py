@@ -760,8 +760,7 @@ if st.session_state.get("main_nav") == "ניהול לקוחות":
                                     updated_subs[body_name] = checked
                                     changed = True
                             with col_link:
-                                st.link_button("🔗 אתר", body_url,
-                                               use_container_width=True)
+                                st.code(body_url, language=None)
                         if changed:
                             crm.update_submissions(cid, updated_subs)
                             st.rerun()
