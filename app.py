@@ -11,6 +11,7 @@ import pandas as pd
 
 from maslaka_parser import parse_maslaka_bytes
 from pdf_generator import generate_report_pdf
+import crm
 
 # ---------------------------------------------------------------------------
 # Page config — must be first Streamlit call
@@ -353,10 +354,106 @@ with st.sidebar:
         _clear_session()
         st.rerun()
 
+    st.markdown('<hr class="lf-divider">', unsafe_allow_html=True)
+    _page = st.radio("ניווט", ["ניתוח לקוח", "ניהול לקוחות"],
+                     horizontal=True, label_visibility="collapsed",
+                     key="main_nav")
+
     st.markdown(
         '<span style="color:#333;font-size:0.7rem;">Nazil | LiquiFund v1.0 · כל הזכויות שמורות</span>',
         unsafe_allow_html=True,
     )
+
+# ---------------------------------------------------------------------------
+# CRM page — renders and stops if selected
+# ---------------------------------------------------------------------------
+if st.session_state.get("main_nav") == "ניהול לקוחות":
+    st.markdown('<div class="lf-header">Nazil 📋</div>', unsafe_allow_html=True)
+    st.markdown('<div class="lf-subheader">ניהול לקוחות · מעקב עסקאות</div>', unsafe_allow_html=True)
+
+    clients = crm.get_all_clients()
+
+    # ── Pipeline summary ──────────────────────────────────────────────────
+    if clients:
+        pipeline_cols = st.columns(len(crm.STATUSES))
+        for col, status in zip(pipeline_cols, crm.STATUSES):
+            count = sum(1 for c in clients if c.get("status") == status)
+            color = crm.STATUS_COLORS.get(status, "#555")
+            with col:
+                st.markdown(f"""
+<div style="background:#161616;border:1px solid #252525;border-top:3px solid {color};
+     border-radius:10px;padding:.8rem;text-align:center">
+  <div style="font-size:.75rem;color:#666">{status}</div>
+  <div style="font-size:1.8rem;font-weight:700;color:{color}">{count}</div>
+</div>""", unsafe_allow_html=True)
+
+    st.markdown('<hr class="lf-divider">', unsafe_allow_html=True)
+
+    # ── Filter ────────────────────────────────────────────────────────────
+    f1, f2 = st.columns([2, 1])
+    with f1:
+        search = st.text_input("חיפוש לקוח", placeholder="שם / טלפון / מייל...",
+                               label_visibility="collapsed")
+    with f2:
+        status_filter = st.selectbox("סטטוס", ["הכל"] + crm.STATUSES,
+                                     label_visibility="collapsed")
+
+    filtered = [
+        c for c in clients
+        if (not search or search in (c.get("name","") + c.get("phone","") + c.get("email","")))
+        and (status_filter == "הכל" or c.get("status") == status_filter)
+    ]
+
+    if not filtered:
+        st.info("אין לקוחות להצגה.")
+    else:
+        for c in filtered:
+            color = crm.STATUS_COLORS.get(c.get("status","ליד"), "#555")
+            created = (c.get("created_at","")[:10] if c.get("created_at") else "")
+            with st.expander(
+                f"**{c.get('name','ללא שם')}** · {c.get('phone','')} · "
+                f"₪{c.get('total_balance',0):,.0f} · {c.get('status','ליד')} · {created}"
+            ):
+                d1, d2, d3, d4 = st.columns(4)
+                for col, lbl, val in [
+                    (d1, "סה\"כ נכסים",  f"₪{c.get('total_balance',0):,.0f}"),
+                    (d2, "פיצויים",       f"₪{c.get('total_pitz',0):,.0f}"),
+                    (d3, "תגמולים",       f"₪{c.get('total_tagm',0):,.0f}"),
+                    (d4, "נטו לחשבון",    f"₪{c.get('net_to_bank',0):,.0f}"),
+                ]:
+                    with col:
+                        st.markdown(f"""
+<div class="stat-card">
+  <div class="s-label">{lbl}</div>
+  <div class="s-value" style="font-size:1rem">{val}</div>
+</div>""", unsafe_allow_html=True)
+
+                st.markdown("<div style='margin-top:.8rem'></div>", unsafe_allow_html=True)
+                sc1, sc2 = st.columns([1, 2])
+                with sc1:
+                    new_status = st.selectbox(
+                        "סטטוס", crm.STATUSES,
+                        index=crm.STATUSES.index(c.get("status","ליד")),
+                        key=f"st_{c['id']}"
+                    )
+                    if new_status != c.get("status"):
+                        crm.update_status(c["id"], new_status)
+                        st.rerun()
+                with sc2:
+                    new_notes = st.text_area(
+                        "הערות", value=c.get("notes",""),
+                        key=f"nt_{c['id']}", height=80
+                    )
+                    if st.button("שמור הערות", key=f"sv_{c['id']}"):
+                        crm.update_notes(c["id"], new_notes)
+                        st.success("נשמר")
+
+                if st.button("מחק לקוח", key=f"del_{c['id']}",
+                             type="secondary"):
+                    crm.delete_client(c["id"])
+                    st.rerun()
+
+    st.stop()
 
 # ---------------------------------------------------------------------------
 # Main — header
@@ -963,6 +1060,40 @@ if _agent_mode:
   💡 עם מע"מ (17%): <strong style="color:#8888ff">₪{total_fee_excl_vat * 1.17:,.0f}</strong>
   &nbsp;|&nbsp; מינימום עם מע"מ: <strong style="color:#f0c040">₪{min_fee * 1.17:,.0f}</strong>
 </div>""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Save client form
+# ---------------------------------------------------------------------------
+st.markdown('<hr class="lf-divider">', unsafe_allow_html=True)
+st.markdown("### שמור לקוח ל-CRM")
+
+with st.form("save_client_form"):
+    fc1, fc2 = st.columns(2)
+    with fc1:
+        cl_name  = st.text_input("שם מלא")
+        cl_phone = st.text_input("טלפון")
+    with fc2:
+        cl_email = st.text_input("אימייל")
+        cl_id    = st.text_input("תעודת זהות")
+    cl_notes = st.text_area("הערות ראשוניות", height=70)
+    submitted = st.form_submit_button("שמור לקוח", type="primary", use_container_width=True)
+
+if submitted:
+    if not cl_name:
+        st.warning("נדרש שם לקוח.")
+    else:
+        saved = crm.save_client(
+            name=cl_name, phone=cl_phone, email=cl_email, id_number=cl_id,
+            total_balance=total, total_pitz=total_pitz, total_tagm=total_tagm,
+            num_funds=len(funds), net_to_bank=net_to_bank,
+            rec_prefer_loan=rec["prefer_loan"],
+            advisor_fee=calc_results.get("effective_tax",{}).get("net",0),
+            notes=cl_notes, fund_data=funds,
+        )
+        if saved:
+            st.success(f"הלקוח **{cl_name}** נשמר בהצלחה! עבור ל-'ניהול לקוחות' לצפייה.")
+        else:
+            st.error("שגיאה בשמירה — בדוק את חיבור Supabase ב-Secrets.")
 
 # ---------------------------------------------------------------------------
 # Sticky legal footer — always visible
