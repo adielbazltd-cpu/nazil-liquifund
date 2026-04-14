@@ -736,15 +736,15 @@ if st.session_state.get("main_nav") == "ניהול לקוחות":
                     with t5:
                         st.caption("עקוב אחר הגשת מסמכים לכל גוף פנסיוני")
                         BODIES = [
-                            ("מנורה מבטחים", "https://www.menora-mivt.co.il/Gemel/Pages/login.aspx"),
-                            ("הפניקס",        "https://digital.phoenix.co.il"),
-                            ("מגדל",          "https://www.migdal.co.il/online"),
-                            ("הראל",          "https://www.harel.co.il/online"),
+                            ("מנורה מבטחים", "https://www.menora-mivt.co.il"),
+                            ("הפניקס",        "https://www.phoenix.co.il"),
+                            ("מגדל",          "https://www.migdal.co.il"),
+                            ("הראל",          "https://www.harel.co.il"),
                             ("כלל ביטוח",     "https://www.clal.co.il"),
                             ("הכשרה",         "https://www.hachshara-ins.co.il"),
                             ("אלטשולר שחם",   "https://www.altshul.co.il"),
-                            ("מיטב",          "https://www.meitav.co.il/digital"),
-                            ("ילין לפידות",   "https://www.yelin-lapidot.co.il/customers"),
+                            ("מיטב",          "https://www.meitav.co.il"),
+                            ("ילין לפידות",   "https://www.yelin-lapidot.co.il"),
                         ]
                         updated_subs = dict(subs)
                         changed = False
