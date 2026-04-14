@@ -40,7 +40,14 @@ def _get_secret(key: str, default: str) -> str:
     except Exception:
         return os.getenv(key, default)
 
-_APP_PASSWORD  = _get_secret("NAZIL_PASSWORD",   "Nazil2026")
+def _get_agents() -> dict:
+    """Return {username: password} dict from secrets, with fallback defaults."""
+    try:
+        return dict(st.secrets["agents"])
+    except Exception:
+        return {"adi": "Nazil2026"}
+
+_AGENTS        = _get_agents()
 _AGENT_CODE_TV = _get_secret("NAZIL_AGENT_CODE", "agent2026")
 
 LEGAL_DISCLAIMER = (
@@ -287,27 +294,45 @@ def _clear_session() -> None:
 # ---------------------------------------------------------------------------
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+if "agent_name" not in st.session_state:
+    st.session_state.agent_name = ""
 
 if not st.session_state.authenticated:
     st.markdown("""
-    <div class="login-card">
-      <div class="lock">🔐</div>
-      <div style="font-size:1.6rem;font-weight:700;color:#e8e8e8;margin-bottom:.3rem">Nazil</div>
-      <div style="font-size:.85rem;color:#555;margin-bottom:1.5rem">מערכת מוגנת — נדרשת סיסמה לכניסה</div>
+    <style>
+    .login-wrap {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; min-height: 80vh; padding: 1rem;
+    }
+    .login-card {
+        width: 100%; max-width: 360px;
+        background: #161616; border: 1px solid #252525;
+        border-radius: 16px; padding: 2.5rem 2rem; text-align: center;
+    }
+    </style>
+    <div class="login-wrap">
+      <div class="login-card">
+        <div class="lock">🔐</div>
+        <div style="font-size:1.6rem;font-weight:700;color:#e8e8e8;margin-bottom:.3rem">Nazil</div>
+        <div style="font-size:.85rem;color:#555;margin-bottom:1.5rem">מערכת סוכנים — נדרשת כניסה</div>
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
-    _, center, _ = st.columns([1, 1, 1])
+    _, center, _ = st.columns([1, 2, 1])
     with center:
+        username = st.text_input("שם משתמש", label_visibility="collapsed",
+                                 placeholder="שם משתמש")
         pwd = st.text_input("סיסמה", type="password", label_visibility="collapsed",
-                            placeholder="הזן סיסמה...")
+                            placeholder="סיסמה")
         if st.button("כניסה למערכת", type="primary", use_container_width=True):
-            # Constant-time comparison — prevents timing-based brute-force
-            if hmac.compare_digest(pwd.encode(), _APP_PASSWORD.encode()):
+            stored_pwd = _AGENTS.get(username.strip().lower())
+            if stored_pwd and hmac.compare_digest(pwd.encode(), stored_pwd.encode()):
                 st.session_state.authenticated = True
+                st.session_state.agent_name = username.strip().lower()
                 st.rerun()
             else:
-                st.error("סיסמה שגויה. נסה שנית.")
+                st.error("שם משתמש או סיסמה שגויים.")
     st.stop()
 
 # ---------------------------------------------------------------------------
