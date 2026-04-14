@@ -566,11 +566,32 @@ if st.session_state.get("main_nav") == "ניהול לקוחות":
                             st.markdown("**שלח דוח PDF**")
                             if st.button("📧 שלח דוח ניתוח", key=f"email_pdf_{cid}",
                                          disabled=not client_email):
+                                # Build PDF from stored fund_data
+                                _pdf_bytes = None
+                                _fund_data = c.get("fund_data") or []
+                                if _fund_data:
+                                    try:
+                                        _rec = compute_arbitrage(
+                                            pitzuim_total=float(c.get("total_pitz", 0)),
+                                            fund_return_pct=DEFAULT_FUND_RETURN,
+                                            prime_pct=DEFAULT_PRIME,
+                                            spread_pct=DEFAULT_SPREAD,
+                                        )
+                                        _alerts = scan_alerts(_fund_data)
+                                        _pdf_bytes = generate_report_pdf(
+                                            funds=_fund_data,
+                                            rec=_rec,
+                                            alerts=_alerts,
+                                        )
+                                    except Exception:
+                                        _pdf_bytes = None
                                 body = email_sender.template_report(c.get("name","לקוח"))
                                 ok, err = email_sender.send_email(
                                     client_email,
                                     "דוח ניתוח פנסיה אישי — Nazil",
                                     body,
+                                    attachment_bytes=_pdf_bytes,
+                                    attachment_name="nazil_report.pdf" if _pdf_bytes else None,
                                 )
                                 if ok:
                                     crm.add_call_log(cid, "📧 נשלח דוח PDF במייל")
