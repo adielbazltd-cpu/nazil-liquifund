@@ -369,89 +369,168 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 if st.session_state.get("main_nav") == "ניהול לקוחות":
     st.markdown('<div class="lf-header">Nazil 📋</div>', unsafe_allow_html=True)
-    st.markdown('<div class="lf-subheader">ניהול לקוחות · מעקב עסקאות</div>', unsafe_allow_html=True)
+    st.markdown('<div class="lf-subheader">ניהול לקוחות · מעקב מליד עד סגירה</div>', unsafe_allow_html=True)
 
     clients = crm.get_all_clients()
 
     # ── Pipeline summary ──────────────────────────────────────────────────
-    if clients:
-        pipeline_cols = st.columns(len(crm.STATUSES))
-        for col, status in zip(pipeline_cols, crm.STATUSES):
-            count = sum(1 for c in clients if c.get("status") == status)
-            color = crm.STATUS_COLORS.get(status, "#555")
-            with col:
-                st.markdown(f"""
+    pipeline_cols = st.columns(len(crm.STATUSES))
+    for col, status in zip(pipeline_cols, crm.STATUSES):
+        count = sum(1 for c in clients if c.get("status") == status)
+        total_val = sum(c.get("total_balance", 0) for c in clients if c.get("status") == status)
+        color = crm.STATUS_COLORS.get(status, "#555")
+        with col:
+            st.markdown(f"""
 <div style="background:#161616;border:1px solid #252525;border-top:3px solid {color};
-     border-radius:10px;padding:.8rem;text-align:center">
-  <div style="font-size:.75rem;color:#666">{status}</div>
-  <div style="font-size:1.8rem;font-weight:700;color:{color}">{count}</div>
+     border-radius:10px;padding:.7rem .8rem;text-align:center;margin-bottom:.5rem">
+  <div style="font-size:.7rem;color:#666;margin-bottom:.2rem">{status}</div>
+  <div style="font-size:1.6rem;font-weight:700;color:{color};line-height:1">{count}</div>
+  {f'<div style="font-size:.65rem;color:#444;margin-top:.2rem">₪{total_val:,.0f}</div>' if total_val else ''}
 </div>""", unsafe_allow_html=True)
 
     st.markdown('<hr class="lf-divider">', unsafe_allow_html=True)
 
-    # ── Filter ────────────────────────────────────────────────────────────
-    f1, f2 = st.columns([2, 1])
-    with f1:
-        search = st.text_input("חיפוש לקוח", placeholder="שם / טלפון / מייל...",
-                               label_visibility="collapsed")
-    with f2:
-        status_filter = st.selectbox("סטטוס", ["הכל"] + crm.STATUSES,
-                                     label_visibility="collapsed")
+    # ── Tabs: list / add lead ─────────────────────────────────────────────
+    crm_tab1, crm_tab2 = st.tabs(["רשימת לקוחות", "הוסף ליד חדש"])
 
-    filtered = [
-        c for c in clients
-        if (not search or search in (c.get("name","") + c.get("phone","") + c.get("email","")))
-        and (status_filter == "הכל" or c.get("status") == status_filter)
-    ]
-
-    if not filtered:
-        st.info("אין לקוחות להצגה.")
-    else:
-        for c in filtered:
-            color = crm.STATUS_COLORS.get(c.get("status","ליד"), "#555")
-            created = (c.get("created_at","")[:10] if c.get("created_at") else "")
-            with st.expander(
-                f"**{c.get('name','ללא שם')}** · {c.get('phone','')} · "
-                f"₪{c.get('total_balance',0):,.0f} · {c.get('status','ליד')} · {created}"
-            ):
-                d1, d2, d3, d4 = st.columns(4)
-                for col, lbl, val in [
-                    (d1, "סה\"כ נכסים",  f"₪{c.get('total_balance',0):,.0f}"),
-                    (d2, "פיצויים",       f"₪{c.get('total_pitz',0):,.0f}"),
-                    (d3, "תגמולים",       f"₪{c.get('total_tagm',0):,.0f}"),
-                    (d4, "נטו לחשבון",    f"₪{c.get('net_to_bank',0):,.0f}"),
-                ]:
-                    with col:
-                        st.markdown(f"""
-<div class="stat-card">
-  <div class="s-label">{lbl}</div>
-  <div class="s-value" style="font-size:1rem">{val}</div>
-</div>""", unsafe_allow_html=True)
-
-                st.markdown("<div style='margin-top:.8rem'></div>", unsafe_allow_html=True)
-                sc1, sc2 = st.columns([1, 2])
-                with sc1:
-                    new_status = st.selectbox(
-                        "סטטוס", crm.STATUSES,
-                        index=crm.STATUSES.index(c.get("status","ליד")),
-                        key=f"st_{c['id']}"
-                    )
-                    if new_status != c.get("status"):
-                        crm.update_status(c["id"], new_status)
+    with crm_tab2:
+        st.markdown("#### הוסף ליד ידני")
+        with st.form("new_lead_form"):
+            nl1, nl2 = st.columns(2)
+            with nl1:
+                nl_name   = st.text_input("שם מלא *")
+                nl_phone  = st.text_input("טלפון *")
+            with nl2:
+                nl_email  = st.text_input("אימייל")
+                nl_source = st.selectbox("מקור", crm.SOURCES)
+            nl_notes = st.text_area("הערת פתיחה", height=70,
+                                    placeholder="רקע ראשוני, צורך, דחיפות...")
+            if st.form_submit_button("הוסף ליד", type="primary", use_container_width=True):
+                if not nl_name or not nl_phone:
+                    st.warning("שם וטלפון הם שדות חובה.")
+                else:
+                    saved = crm.create_lead(nl_name, nl_phone, nl_email, nl_source, nl_notes)
+                    if saved:
+                        st.success(f"הליד **{nl_name}** נוסף! עבור לרשימת לקוחות.")
                         st.rerun()
-                with sc2:
-                    new_notes = st.text_area(
-                        "הערות", value=c.get("notes",""),
-                        key=f"nt_{c['id']}", height=80
-                    )
-                    if st.button("שמור הערות", key=f"sv_{c['id']}"):
-                        crm.update_notes(c["id"], new_notes)
-                        st.success("נשמר")
+                    else:
+                        st.error("שגיאה בשמירה.")
 
-                if st.button("מחק לקוח", key=f"del_{c['id']}",
-                             type="secondary"):
-                    crm.delete_client(c["id"])
-                    st.rerun()
+    with crm_tab1:
+        # ── Filters ───────────────────────────────────────────────────────
+        f1, f2, f3 = st.columns([3, 2, 2])
+        with f1:
+            search = st.text_input("🔍", placeholder="חיפוש שם / טלפון / מייל...",
+                                   label_visibility="collapsed", key="crm_search")
+        with f2:
+            status_filter = st.selectbox("סטטוס", ["הכל"] + crm.STATUSES,
+                                         label_visibility="collapsed", key="crm_sf")
+        with f3:
+            source_filter = st.selectbox("מקור", ["הכל"] + crm.SOURCES,
+                                         label_visibility="collapsed", key="crm_src")
+
+        filtered = [
+            c for c in clients
+            if (not search or search in (c.get("name","") + c.get("phone","") + c.get("email","")))
+            and (status_filter == "הכל" or c.get("status") == status_filter)
+            and (source_filter == "הכל" or c.get("source","") == source_filter)
+        ]
+
+        st.caption(f"{len(filtered)} לקוחות")
+
+        if not filtered:
+            st.info("אין לקוחות להצגה.")
+        else:
+            for c in filtered:
+                cid      = c["id"]
+                color    = crm.STATUS_COLORS.get(c.get("status","ליד"), "#555")
+                created  = c.get("created_at","")[:10] if c.get("created_at") else ""
+                logs     = c.get("call_log") or []
+                last_log = logs[-1]["date"] if logs else "—"
+                follow   = c.get("follow_up_date","") or ""
+                follow_flag = f" · ⏰ {follow}" if follow else ""
+                bal      = c.get("total_balance", 0)
+                bal_str  = f" · ₪{bal:,.0f}" if bal else ""
+
+                with st.expander(
+                    f"**{c.get('name','ללא שם')}** · {c.get('phone','')} · "
+                    f"[{c.get('status','ליד')}]{bal_str}{follow_flag}"
+                ):
+                    # ── Status buttons ────────────────────────────────────
+                    st.markdown("**עדכן סטטוס:**")
+                    btn_cols = st.columns(len(crm.STATUSES))
+                    for bcol, s in zip(btn_cols, crm.STATUSES):
+                        is_current = c.get("status") == s
+                        bcolor = crm.STATUS_COLORS.get(s, "#555")
+                        with bcol:
+                            if st.button(
+                                s, key=f"sb_{cid}_{s}",
+                                type="primary" if is_current else "secondary",
+                                use_container_width=True,
+                            ):
+                                if not is_current:
+                                    crm.update_status(cid, s)
+                                    st.rerun()
+
+                    st.markdown('<hr class="lf-divider">', unsafe_allow_html=True)
+
+                    # ── Financial summary ─────────────────────────────────
+                    if bal:
+                        fd1, fd2, fd3, fd4 = st.columns(4)
+                        for fcol, lbl, val in [
+                            (fd1, 'סה"כ נכסים',   f"₪{bal:,.0f}"),
+                            (fd2, "פיצויים",        f"₪{c.get('total_pitz',0):,.0f}"),
+                            (fd3, "תגמולים",        f"₪{c.get('total_tagm',0):,.0f}"),
+                            (fd4, "נטו לחשבון",     f"₪{c.get('net_to_bank',0):,.0f}"),
+                        ]:
+                            with fcol:
+                                st.markdown(f"""
+<div class="stat-card" style="padding:.6rem .8rem">
+  <div class="s-label">{lbl}</div>
+  <div class="s-value" style="font-size:.95rem">{val}</div>
+</div>""", unsafe_allow_html=True)
+                        st.markdown("<div style='margin:.5rem 0'></div>", unsafe_allow_html=True)
+
+                    # ── Call log ──────────────────────────────────────────
+                    st.markdown("**יומן שיחות:**")
+                    if logs:
+                        for entry in reversed(logs):
+                            st.markdown(f"""
+<div style="background:#0d0d0d;border-right:3px solid #00d4aa;border-radius:6px;
+     padding:.5rem .8rem;margin-bottom:.4rem">
+  <div style="font-size:.7rem;color:#555">{entry.get('date','')}</div>
+  <div style="font-size:.85rem;color:#ccc">{entry.get('note','')}</div>
+</div>""", unsafe_allow_html=True)
+                    else:
+                        st.caption("אין שיחות רשומות עדיין.")
+
+                    # ── Add call note ─────────────────────────────────────
+                    with st.form(f"call_form_{cid}"):
+                        new_note = st.text_area("סיכום שיחה / הערה", height=80,
+                                                placeholder="מה עלה בשיחה? מה ההחלטה? מה השלב הבא?",
+                                                key=f"cn_{cid}")
+                        n1, n2 = st.columns([3, 1])
+                        with n1:
+                            follow_val = st.date_input(
+                                "תזכורת מעקב",
+                                value=None,
+                                key=f"fu_{cid}",
+                            )
+                        with n2:
+                            st.markdown("<div style='margin-top:1.7rem'></div>", unsafe_allow_html=True)
+                            save_note = st.form_submit_button("שמור", type="primary", use_container_width=True)
+
+                    if save_note:
+                        if new_note.strip():
+                            crm.add_call_log(cid, new_note)
+                        if follow_val:
+                            crm.update_follow_up(cid, follow_val)
+                        st.rerun()
+
+                    # ── Delete ────────────────────────────────────────────
+                    if st.button("🗑 מחק לקוח", key=f"del_{cid}", type="secondary"):
+                        crm.delete_client(cid)
+                        st.rerun()
 
     st.stop()
 
