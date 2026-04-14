@@ -611,6 +611,64 @@ total_tagm = df["יתרת תגמולים (₪)"].sum()
 net_to_bank = rec["net_withdrawal"]
 
 # ---------------------------------------------------------------------------
+# Auto client form — shown immediately after file upload
+# ---------------------------------------------------------------------------
+_file_key = str(sorted([f.name for f in uploaded_files]))
+_saved_key = f"client_saved_{_file_key}"
+
+if not st.session_state.get(_saved_key):
+    st.markdown("""
+<div style="background:#071a14;border:2px solid #00d4aa55;border-radius:14px;
+     padding:1.2rem 1.5rem;margin-bottom:1rem">
+  <div style="font-size:1rem;font-weight:700;color:#00d4aa;margin-bottom:.8rem">
+    פתח תיק לקוח — הנתונים הפיננסיים ממולאים אוטומטית
+  </div>""", unsafe_allow_html=True)
+
+    with st.form("auto_client_form"):
+        ac1, ac2, ac3 = st.columns(3)
+        with ac1:
+            ac_name   = st.text_input("שם מלא *", placeholder="ישראל ישראלי")
+            ac_phone  = st.text_input("טלפון *", placeholder="050-0000000")
+        with ac2:
+            ac_email  = st.text_input("אימייל", placeholder="israel@gmail.com")
+            ac_source = st.selectbox("מקור הליד", crm.SOURCES)
+        with ac3:
+            ac_note   = st.text_area("הערת פתיחה", height=88,
+                                     placeholder="צורך, דחיפות, רקע...")
+        col_save, col_skip = st.columns([3, 1])
+        with col_save:
+            do_save = st.form_submit_button("פתח תיק לקוח", type="primary",
+                                            use_container_width=True)
+        with col_skip:
+            do_skip = st.form_submit_button("דלג", use_container_width=True)
+
+    if do_save:
+        if not ac_name or not ac_phone:
+            st.warning("שם וטלפון הם שדות חובה.")
+        else:
+            saved = crm.save_client(
+                name=ac_name, phone=ac_phone, email=ac_email,
+                id_number="", total_balance=total,
+                total_pitz=total_pitz, total_tagm=total_tagm,
+                num_funds=len(funds), net_to_bank=net_to_bank,
+                rec_prefer_loan=rec["prefer_loan"],
+                advisor_fee=0, notes=ac_note,
+                fund_data=funds, source=ac_source,
+            )
+            if saved:
+                st.session_state[_saved_key] = True
+                st.success(f"תיק **{ac_name}** נפתח בהצלחה — נשמר ב-CRM.")
+                st.rerun()
+            else:
+                st.error("שגיאה בשמירה.")
+
+    if do_skip:
+        st.session_state[_saved_key] = True
+        st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
 # Summary stat cards
 # ---------------------------------------------------------------------------
 c1, c2, c3, c4 = st.columns(4)
@@ -1140,39 +1198,6 @@ if _agent_mode:
   &nbsp;|&nbsp; מינימום עם מע"מ: <strong style="color:#f0c040">₪{min_fee * 1.17:,.0f}</strong>
 </div>""", unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------------
-# Save client form
-# ---------------------------------------------------------------------------
-st.markdown('<hr class="lf-divider">', unsafe_allow_html=True)
-st.markdown("### שמור לקוח ל-CRM")
-
-with st.form("save_client_form"):
-    fc1, fc2 = st.columns(2)
-    with fc1:
-        cl_name  = st.text_input("שם מלא")
-        cl_phone = st.text_input("טלפון")
-    with fc2:
-        cl_email = st.text_input("אימייל")
-        cl_id    = st.text_input("תעודת זהות")
-    cl_notes = st.text_area("הערות ראשוניות", height=70)
-    submitted = st.form_submit_button("שמור לקוח", type="primary", use_container_width=True)
-
-if submitted:
-    if not cl_name:
-        st.warning("נדרש שם לקוח.")
-    else:
-        saved = crm.save_client(
-            name=cl_name, phone=cl_phone, email=cl_email, id_number=cl_id,
-            total_balance=total, total_pitz=total_pitz, total_tagm=total_tagm,
-            num_funds=len(funds), net_to_bank=net_to_bank,
-            rec_prefer_loan=rec["prefer_loan"],
-            advisor_fee=calc_results.get("effective_tax",{}).get("net",0),
-            notes=cl_notes, fund_data=funds,
-        )
-        if saved:
-            st.success(f"הלקוח **{cl_name}** נשמר בהצלחה! עבור ל-'ניהול לקוחות' לצפייה.")
-        else:
-            st.error("שגיאה בשמירה — בדוק את חיבור Supabase ב-Secrets.")
 
 # ---------------------------------------------------------------------------
 # Sticky legal footer — always visible
