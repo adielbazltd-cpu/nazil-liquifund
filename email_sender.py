@@ -94,6 +94,38 @@ def template_report(client_name: str, agent_name: str = "צוות נאזיל") -
 </div>"""
 
 
+def template_contract(client_name: str, agent_name: str = "צוות נאזיל") -> str:
+    return f"""
+<div dir="rtl" style="font-family:Arial,sans-serif;max-width:600px;margin:auto;
+     background:#f9f9f9;border-radius:12px;overflow:hidden">
+  <div style="background:#1a237e;padding:24px 32px">
+    <h1 style="color:#fff;margin:0;font-size:22px">Nazil 💰</h1>
+    <p style="color:#8fa8e8;margin:4px 0 0;font-size:13px">הסכם שירות לחתימה</p>
+  </div>
+  <div style="padding:32px;background:#fff">
+    <p style="font-size:16px;color:#222">שלום <strong>{client_name}</strong>,</p>
+    <p style="color:#444;line-height:1.7">
+      מצורף הסכם השירות שלנו לבדיקתך וחתימתך.
+    </p>
+    <p style="color:#444;line-height:1.7">
+      <strong>הוראות:</strong><br>
+      1. הורד את המסמך המצורף (PDF)<br>
+      2. חתום על ההסכם (ידנית או דיגיטלית)<br>
+      3. שלח בחזרה אלינו את המסמך החתום למייל זה
+    </p>
+    <p style="color:#444;line-height:1.7">
+      לכל שאלה — אנחנו כאן.
+    </p>
+    <p style="color:#666;font-size:14px;margin-top:32px;border-top:1px solid #eee;padding-top:16px">
+      {agent_name} | Nazil<br>
+      <span style="color:#999;font-size:12px">
+        מסמך זה הינו הסכם שירות בלבד ואינו ייעוץ משפטי.
+      </span>
+    </p>
+  </div>
+</div>"""
+
+
 def template_followup(client_name: str, message: str, agent_name: str = "צוות נאזיל") -> str:
     return f"""
 <div dir="rtl" style="font-family:Arial,sans-serif;max-width:600px;margin:auto;

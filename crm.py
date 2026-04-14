@@ -119,6 +119,39 @@ def update_notes(client_id: str, notes: str) -> None:
         sb.table("clients").update({"notes": notes}).eq("id", client_id).execute()
 
 
+def update_payment(
+    client_id: str,
+    payment_status: str,
+    payment_amount: float,
+    payment_due_date=None,
+) -> None:
+    sb = _get_client()
+    if sb:
+        val = {
+            "payment_status": payment_status,
+            "payment_amount": payment_amount,
+        }
+        if payment_due_date:
+            val["payment_due_date"] = (
+                payment_due_date.isoformat()
+                if hasattr(payment_due_date, "isoformat")
+                else str(payment_due_date)
+            )
+        sb.table("clients").update(val).eq("id", client_id).execute()
+
+
+def update_submissions(client_id: str, submissions: dict) -> None:
+    sb = _get_client()
+    if sb:
+        sb.table("clients").update({"submissions": submissions}).eq("id", client_id).execute()
+
+
+def update_contract_status(client_id: str, signed: bool) -> None:
+    sb = _get_client()
+    if sb:
+        sb.table("clients").update({"contract_signed": signed}).eq("id", client_id).execute()
+
+
 def delete_client(client_id: str) -> None:
     sb = _get_client()
     if sb:

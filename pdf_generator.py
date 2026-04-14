@@ -467,3 +467,135 @@ def generate_report_pdf(
     buf = io.BytesIO()
     pdf.output(buf)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Contract PDF
+# ---------------------------------------------------------------------------
+
+def generate_contract_pdf(
+    client_name: str,
+    id_number: str = "",
+    phone: str = "",
+    email: str = "",
+    advisor_fee: float = 0.0,
+    agent_name: str = "נאזיל",
+) -> bytes:
+    """Generate a service agreement PDF for client signature."""
+    from datetime import date as _date
+
+    class _Contract(FPDF):
+        def __init__(self):
+            super().__init__()
+            self.add_font("dv", fname=_FONT_REG)
+            self.add_font("dv", style="B", fname=_FONT_BOLD)
+            self.set_auto_page_break(auto=True, margin=20)
+            self.set_margins(left=20, top=40, right=20)
+
+        def header(self):
+            self.set_fill_color(*_NAVY)
+            self.rect(0, 0, 210, 30, style="F")
+            self.set_fill_color(*_GREEN_NET)
+            self.rect(0, 30, 210, 1, style="F")
+            self.set_xy(15, 8)
+            self.set_font("dv", style="B", size=18)
+            self.set_text_color(*_WHITE)
+            self.cell(60, 10, "Nazil", ln=False)
+            self.set_xy(15, 20)
+            self.set_font("dv", size=7)
+            self.set_text_color(180, 190, 230)
+            self.cell(60, 6, _h("nazil.info"), ln=False)
+
+        def footer(self):
+            self.set_auto_page_break(False)
+            self.set_y(-14)
+            self.set_font("dv", size=7)
+            self.set_text_color(*_TEXT_MUTED)
+            self.cell(0, 6, _h(f"Nazil | עמוד {self.page_no()} | מסמך זה הינו הסכם שירות בלבד"), align="C")
+            self.set_auto_page_break(True, margin=20)
+
+    def row(pdf, label, value):
+        pdf.set_font("dv", style="B", size=10)
+        pdf.set_text_color(*_TEXT_DARK)
+        pdf.cell(50, 7, _h(label + ":"), align="R", ln=False)
+        pdf.set_font("dv", size=10)
+        pdf.cell(110, 7, value if not _is_heb(value) else _h(value), ln=True)
+
+    def section(pdf, title):
+        pdf.ln(4)
+        pdf.set_fill_color(*_NAVY)
+        pdf.set_text_color(*_WHITE)
+        pdf.set_font("dv", style="B", size=11)
+        pdf.cell(170, 8, _h(title), fill=True, align="R", ln=True)
+        pdf.set_text_color(*_TEXT_DARK)
+        pdf.ln(2)
+
+    def para(pdf, text):
+        pdf.set_font("dv", size=9)
+        pdf.set_text_color(*_TEXT_DARK)
+        pdf.multi_cell(170, 5.5, _h(text), align="R")
+        pdf.ln(1)
+
+    def sig_line(pdf, label):
+        pdf.ln(4)
+        pdf.set_font("dv", size=9)
+        pdf.set_text_color(*_TEXT_MUTED)
+        pdf.cell(170, 6, _h(label), align="R", ln=True)
+        pdf.set_draw_color(160, 160, 160)
+        x = pdf.get_x() + 20
+        y = pdf.get_y()
+        pdf.line(x, y, x + 130, y)
+        pdf.ln(8)
+
+    pdf = _Contract()
+    pdf.add_page()
+    today_str = _date.today().strftime("%d/%m/%Y")
+
+    # Title
+    pdf.set_font("dv", style="B", size=15)
+    pdf.set_text_color(*_NAVY)
+    pdf.cell(170, 10, _h("הסכם שירות — ייעוץ ופיתוח פנסיוני"), align="C", ln=True)
+    pdf.set_font("dv", size=9)
+    pdf.set_text_color(*_TEXT_MUTED)
+    pdf.cell(170, 6, _h(f"תאריך: {today_str}"), align="C", ln=True)
+    pdf.ln(4)
+
+    section(pdf, "פרטי הלקוח")
+    row(pdf, "שם מלא", client_name)
+    row(pdf, "תעודת זהות", id_number or "_______________")
+    row(pdf, "טלפון", phone or "_______________")
+    row(pdf, "דואר אלקטרוני", email or "_______________")
+
+    section(pdf, "פרטי ההסכם")
+    para(pdf, (
+        "הלקוח המפורט לעיל (להלן: 'הלקוח') מסכים לקבל שירותי ייעוץ וניתוח קרנות פנסיה "
+        "מ-Nazil (להלן: 'נותן השירות')."
+    ))
+    para(pdf, (
+        "השירות כולל: ניתוח קרנות פנסיה קיימות, חישוב פוטנציאל פיצויים ותגמולים, "
+        "המלצות בנוגע להלוואה על חשבון פנסיה מול משיכה, והכנת דוח אישי."
+    ))
+    row(pdf, "שכר טרחה מוסכם", f"\u20AA{advisor_fee:,.0f}" if advisor_fee else "לפי הסכמה")
+    para(pdf, (
+        "התשלום יבוצע בסיום התהליך ואישור הלקוח. "
+        "ביטול ההסכם אפשרי עד 14 יום מחתימתו ללא חיוב."
+    ))
+
+    section(pdf, "הצהרות הלקוח")
+    para(pdf, (
+        "הלקוח מאשר כי:\n"
+        "• קיבל הסבר מלא על השירות ותמחורו.\n"
+        "• ידוע לו שהמידע המוצג הוא סימולציה ואינו ייעוץ פנסיוני מוסמך.\n"
+        "• ביצוע פעולות בקרנות עלול לפגוע בזכויות פנסיה וביטוח.\n"
+        "• הסכים לאיסוף ועיבוד נתונים לצורך מתן השירות בלבד."
+    ))
+
+    section(pdf, "חתימות")
+    sig_line(pdf, "חתימת הלקוח + תאריך")
+    sig_line(pdf, f"חתימת נותן השירות ({agent_name}) + תאריך")
+
+    para(pdf, "מסמך זה נוצר אוטומטית על-ידי מערכת Nazil ואינו מהווה ייעוץ משפטי.")
+
+    buf = io.BytesIO()
+    pdf.output(buf)
+    return buf.getvalue()

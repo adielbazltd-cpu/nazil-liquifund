@@ -552,8 +552,9 @@ if st.session_state.get("main_nav") == "ניהול לקוחות":
                                 crm.update_follow_up(cid, follow_val)
                             st.rerun()
 
-                    # ── Tab 3: Emails ─────────────────────────────────────
+                    # ── Tab 3: Emails & Contracts ─────────────────────────
                     with t3:
+                        from pdf_generator import generate_contract_pdf
                         client_email = c.get("email","")
                         if not client_email:
                             st.warning("אין כתובת מייל ללקוח זה.")
@@ -568,7 +569,7 @@ if st.session_state.get("main_nav") == "ניהול לקוחות":
                                 body = email_sender.template_report(c.get("name","לקוח"))
                                 ok, err = email_sender.send_email(
                                     client_email,
-                                    f"דוח ניתוח פנסיה אישי — Nazil",
+                                    "דוח ניתוח פנסיה אישי — Nazil",
                                     body,
                                 )
                                 if ok:
@@ -594,6 +595,81 @@ if st.session_state.get("main_nav") == "ניהול לקוחות":
                                         st.success("נשלח!")
                                     else:
                                         st.error(f"שגיאה: {err}")
+
+                        st.markdown('<hr class="lf-divider">', unsafe_allow_html=True)
+                        st.markdown("**📝 הסכם שירות לחתימה**")
+
+                        contract_signed = bool(c.get("contract_signed", False))
+                        signed_label = "✅ חתום" if contract_signed else "⏳ ממתין לחתימה"
+                        signed_color = "#00e676" if contract_signed else "#f0c040"
+                        st.markdown(
+                            f'<span style="color:{signed_color};font-size:.85rem">'
+                            f'סטטוס חוזה: <strong>{signed_label}</strong></span>',
+                            unsafe_allow_html=True,
+                        )
+
+                        contr_col1, contr_col2, contr_col3 = st.columns(3)
+
+                        with contr_col1:
+                            # Download button — always available
+                            try:
+                                contract_bytes = generate_contract_pdf(
+                                    client_name=c.get("name","לקוח"),
+                                    id_number=c.get("id_number",""),
+                                    phone=c.get("phone",""),
+                                    email=client_email,
+                                    advisor_fee=float(c.get("advisor_fee",0)),
+                                )
+                                st.download_button(
+                                    "⬇️ הורד חוזה PDF",
+                                    data=contract_bytes,
+                                    file_name=f"contract_{c.get('name','client').replace(' ','_')}.pdf",
+                                    mime="application/pdf",
+                                    key=f"dl_contract_{cid}",
+                                    use_container_width=True,
+                                )
+                            except Exception as ex:
+                                st.error(f"שגיאה ביצירת PDF: {ex}")
+                                contract_bytes = None
+
+                        with contr_col2:
+                            if st.button("📨 שלח חוזה למייל", key=f"send_contract_{cid}",
+                                         disabled=not client_email,
+                                         use_container_width=True):
+                                try:
+                                    cb = generate_contract_pdf(
+                                        client_name=c.get("name","לקוח"),
+                                        id_number=c.get("id_number",""),
+                                        phone=c.get("phone",""),
+                                        email=client_email,
+                                        advisor_fee=float(c.get("advisor_fee",0)),
+                                    )
+                                    body = email_sender.template_contract(c.get("name","לקוח"))
+                                    ok, err = email_sender.send_email(
+                                        client_email,
+                                        "הסכם שירות לחתימה — Nazil",
+                                        body,
+                                        attachment_bytes=cb,
+                                        attachment_name="contract_nazil.pdf",
+                                    )
+                                    if ok:
+                                        crm.add_call_log(cid, "📝 נשלח חוזה לחתימה במייל")
+                                        st.success("החוזה נשלח!")
+                                    else:
+                                        st.error(f"שגיאה: {err}")
+                                except Exception as ex:
+                                    st.error(f"שגיאה: {ex}")
+
+                        with contr_col3:
+                            new_signed = st.toggle(
+                                "סמן כחתום",
+                                value=contract_signed,
+                                key=f"contract_toggle_{cid}",
+                            )
+                            if new_signed != contract_signed:
+                                crm.update_contract_status(cid, new_signed)
+                                crm.add_call_log(cid, "📝 חוזה סומן כחתום" if new_signed else "📝 חוזה סומן כלא חתום")
+                                st.rerun()
 
                     # ── Tab 4: Payment ────────────────────────────────────
                     with t4:
@@ -639,15 +715,15 @@ if st.session_state.get("main_nav") == "ניהול לקוחות":
                     with t5:
                         st.caption("עקוב אחר הגשת מסמכים לכל גוף פנסיוני")
                         BODIES = [
-                            ("מנורה מבטחים", "https://www.menora-mivt.co.il"),
-                            ("הפניקס",        "https://www.phoenix.co.il"),
-                            ("מגדל",          "https://www.migdal.co.il"),
-                            ("הראל",          "https://www.harel-group.co.il"),
-                            ("כלל ביטוח",     "https://www.kll.co.il"),
-                            ("הכשרה",         "https://www.hakhshara.co.il"),
+                            ("מנורה מבטחים", "https://www.menora-mivt.co.il/Gemel/Pages/login.aspx"),
+                            ("הפניקס",        "https://digital.phoenix.co.il"),
+                            ("מגדל",          "https://www.migdal.co.il/online"),
+                            ("הראל",          "https://www.harel.co.il/online"),
+                            ("כלל ביטוח",     "https://www.clal.co.il"),
+                            ("הכשרה",         "https://www.hachshara-ins.co.il"),
                             ("אלטשולר שחם",   "https://www.altshul.co.il"),
-                            ("מיטב",          "https://www.meitav.co.il"),
-                            ("ילין לפידות",   "https://www.yelin-lapidot.co.il"),
+                            ("מיטב",          "https://www.meitav.co.il/digital"),
+                            ("ילין לפידות",   "https://www.yelin-lapidot.co.il/customers"),
                         ]
                         updated_subs = dict(subs)
                         changed = False
